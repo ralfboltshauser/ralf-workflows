@@ -1,0 +1,27 @@
+# Ephemeral data (never commit)
+node_modules/
+executions/
+runs/
+sandboxes/
+remote/
+state/
+tmp/
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+dist/
+.DS_Store
+
+# Log files
+*.log
+logs/
+
+# Nested Smithers runtime state created when running workflows from subdirectories
+**/.smithers/executions/
+**/.smithers/runs/
+**/.smithers/sandboxes/
+**/.smithers/remote/
+**/.smithers/state/
+**/.smithers/tmp/
+**/.smithers/logs/

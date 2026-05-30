@@ -1,0 +1,17 @@
+.DS_Store
+*.log
+*.db
+*.sqlite
+*.db-shm
+*.db-wal
+node_modules/
+dist/
+
+# Smithers runtime state
+**/.smithers/executions/
+**/.smithers/runs/
+**/.smithers/sandboxes/
+**/.smithers/remote/
+**/.smithers/state/
+**/.smithers/tmp/
+**/.smithers/logs/

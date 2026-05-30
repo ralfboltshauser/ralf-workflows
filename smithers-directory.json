@@ -1,0 +1,14 @@
+{
+  "name": "ralf-workflows",
+  "description": "Ralf's public Smithers workflow pack for Codex-powered planning, implementation, review, research, and maintenance workflows.",
+  "workflows": [
+    {
+      "name": "hello-world",
+      "entry": ".smithers/workflows/hello-world.tsx",
+      "description": "Return a static Hello World response.",
+      "tags": ["example", "hello-world"],
+      "env": [],
+      "capabilities": []
+    }
+  ]
+}
