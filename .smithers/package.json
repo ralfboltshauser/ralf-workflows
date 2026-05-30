@@ -4,10 +4,8 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "gateway": "bun ./gateway.ts",
     "workflow:list": "smithers workflow list",
     "workflow:run": "smithers workflow run",
-    "workflow:implement": "smithers workflow implement",
     "workflow:inspect": "smithers workflow inspect",
     "workflow:skills": "smithers workflow skills"
   },

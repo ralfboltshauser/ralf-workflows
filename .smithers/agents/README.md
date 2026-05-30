@@ -2,16 +2,14 @@
 
 These files export the configured agent instances used by your Smithers workflows.
 
-- `claude-code.ts`, `codex.ts`, and `antigravity.ts` are user-owned config.
-- Edit them to pin models, set `cwd`, add a shared `systemPrompt`, or enable engine-specific flags.
-- `index.ts` re-exports all three so root-level files can import from `./agents`.
+- `codex.ts` is user-owned config.
+- Edit it to pin models, set `cwd`, add a shared `systemPrompt`, or enable Codex-specific flags.
+- `index.ts` re-exports Codex so root-level files can import from `./agents`.
 
 Examples:
 
 ```ts
-import { ClaudeCodeAgent } from "./agents";
 import { CodexAgent } from "./agents/codex";
-import { AntigravityAgent } from "./agents/antigravity";
 ```
 
 Inside `.smithers/workflows/*`, use `../agents` or `../agents/<name>` instead.
