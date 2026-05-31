@@ -17,6 +17,14 @@
       "tags": ["bugbot", "regression-audit", "code-review", "testing", "local-diff"],
       "env": [],
       "capabilities": ["filesystem", "shell", "codex"]
+    },
+    {
+      "name": "lighthouse-check",
+      "entry": ".smithers/workflows/lighthouse-check.tsx",
+      "description": "Run local and optional production Lighthouse checks, review artifacts and codebase context, and produce a reviewed remediation report.",
+      "tags": ["lighthouse", "performance", "accessibility", "seo", "web", "optimization"],
+      "env": [],
+      "capabilities": ["filesystem", "shell", "codex", "network"]
     }
   ]
 }

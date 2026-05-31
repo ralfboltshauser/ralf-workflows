@@ -16,3 +16,4 @@ dist/
 **/.smithers/tmp/
 **/.smithers/logs/
 **/.smithers/bug-regression-audit-reports/
+**/.smithers/lighthouse-reports/
