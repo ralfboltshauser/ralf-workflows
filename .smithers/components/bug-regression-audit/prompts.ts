@@ -26,7 +26,44 @@ const compactInput = (input: WorkflowInput) => ({
   maxFindings: input.maxFindings,
   outputDir: input.outputDir,
   checkCommands: input.checkCommands,
+  configPath: input.configPath ?? null,
+  ignoreGlobs: input.ignoreGlobs,
+  ignoreRegexes: input.ignoreRegexes,
+  includeGenerated: input.includeGenerated,
+  maxDiffTokens: input.maxDiffTokens ?? null,
+  contextLines: input.contextLines ?? null,
+  minConfidence: input.minConfidence,
   feedbackPresent: Boolean(input.feedback),
+});
+
+const compactHunk = (hunk: Record<string, unknown>) => ({
+  oldStart: hunk.oldStart,
+  oldLines: hunk.oldLines,
+  newStart: hunk.newStart,
+  newLines: hunk.newLines,
+  section: compactText(hunk.section, 180),
+  oldSideLines: Array.isArray(hunk.oldSideLines) ? hunk.oldSideLines.slice(0, 80) : [],
+  newSideLines: Array.isArray(hunk.newSideLines) ? hunk.newSideLines.slice(0, 80) : [],
+});
+
+const compactDiffBundle = (intake: DiffIntake, maxFiles = 12, maxHunks = 8) => ({
+  baseCommit: intake.diffBundle.baseCommit,
+  headCommit: intake.diffBundle.headCommit,
+  effectiveBaseCommit: intake.diffBundle.effectiveBaseCommit,
+  budget: intake.diffBundle.budget,
+  files: intake.diffBundle.files.slice(0, maxFiles).map((file) => ({
+    path: file.path,
+    oldPath: file.oldPath,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    generated: file.generated,
+    binary: file.binary,
+    tokenEstimate: file.tokenEstimate,
+    truncated: file.truncated,
+    hunks: file.hunks.slice(0, maxHunks).map((hunk) => compactHunk(hunk)),
+  })),
+  skippedFiles: intake.diffBundle.skippedFiles.slice(0, 40),
 });
 
 const compactIntake = (intake: DiffIntake, opts: { includeDiff?: boolean } = {}) => ({
@@ -46,7 +83,19 @@ const compactIntake = (intake: DiffIntake, opts: { includeDiff?: boolean } = {})
   untrackedFiles: compactList(intake.untrackedFiles, 20, 240),
   changedFiles: intake.changedFiles.slice(0, 40),
   diffSummary: compactText(intake.diffSummary, 6_000),
-  unifiedDiff: opts.includeDiff ? compactText(intake.unifiedDiff, 55_000) : undefined,
+  auditConfig: {
+    configLoaded: intake.auditConfig.configLoaded,
+    ignoreGlobs: intake.auditConfig.ignoreGlobs,
+    ignoreRegexes: intake.auditConfig.ignoreRegexes,
+    projectRules: compactList(intake.auditConfig.projectRules, 12, 500),
+    auditMode: intake.auditConfig.auditMode,
+    includeGenerated: intake.auditConfig.includeGenerated,
+    maxDiffTokens: intake.auditConfig.maxDiffTokens,
+    contextLines: intake.auditConfig.contextLines,
+    minConfidence: intake.auditConfig.minConfidence,
+  },
+  diffBundle: compactDiffBundle(intake, opts.includeDiff ? 18 : 8, opts.includeDiff ? 12 : 4),
+  unifiedDiff: opts.includeDiff ? compactText(intake.unifiedDiff, 12_000) : undefined,
   diffTruncated: intake.diffTruncated,
   limitations: compactList(intake.limitations, 8, 500),
 });
@@ -213,6 +262,8 @@ const compactSynthesized = (value: unknown) => {
 const auditMethod = `
 Audit method:
 - Treat the diff as the primary evidence. Fetch extra context only when needed to prove or disprove a bug.
+- Use diffBundle hunks as the source of truth for changed lines. Cite affected files as file:line on newSideLines when possible.
+- Distinguish added lines, context lines, deleted lines, skipped files, and generated files. Do not invent line numbers.
 - Prefer concrete regression hypotheses over broad code review comments.
 - A finding must tie changed code to user-visible behavior, data integrity, security/permission behavior, API contract behavior, or missing focused coverage.
 - Do not propose style, maintainability, or refactor-only comments as bugs.
@@ -251,6 +302,7 @@ ${formatJson({
   repoRoot: intake.repoRoot,
   currentBranch: intake.currentBranch,
   changedFiles: intake.changedFiles.map((file) => file.path),
+  projectRules: intake.auditConfig.projectRules,
 })}
 
 If no relevant memory is available, return empty arrays and explain that in memoryLimitations.
@@ -298,12 +350,7 @@ Repository root:
 ${intake.repoRoot}
 
 Diff intake:
-${formatJson({
-  repoRoot: intake.repoRoot,
-  changedFiles: intake.changedFiles,
-  diffSummary: intake.diffSummary,
-  diffTruncated: intake.diffTruncated,
-})}
+${formatJson(compactIntake(intake))}
 
 Change map:
 ${formatJson(compactChangeMap(changeMap))}
@@ -334,12 +381,7 @@ Workflow input:
 ${formatJson(compactInput(input))}
 
 Diff intake:
-${formatJson({
-  repoRoot: intake.repoRoot,
-  changedFiles: intake.changedFiles,
-  diffSummary: intake.diffSummary,
-  diffTruncated: intake.diffTruncated,
-})}
+${formatJson(compactIntake(intake))}
 
 Change map:
 ${formatJson(compactChangeMap(changeMap))}
@@ -410,6 +452,7 @@ ${formatJson(compactChecks(checks))}
 
 Return a candidate batch. Use stable finding ids like "${hunter.id}-001".
 Only put concrete bug hypotheses in candidates. Put weaker leads in weakSignals or discardedSignals.
+For each candidate, affectedFiles should reference the most relevant new-side line from diffBundle when one exists.
 `;
 
 export const deepPanelPrompt = (
@@ -489,6 +532,7 @@ ${formatJson(compactChecks(checks))}
 
 Judging rules:
 - Keep a finding only if it has changed-code evidence and a plausible failure mode.
+- Prefer findings whose affectedFiles point to exact new-side diff lines.
 - Discard items that are pre-existing, speculative, only missing style polish, or not tied to the diff.
 - If evidence is mixed, downgrade confidence and explain limitations.
 - Rank retained findings by severity, confidence, blast radius, and reproducibility.

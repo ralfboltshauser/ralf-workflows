@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { AuditReport, CheckEvidence, DiffIntake, ValidationReport, WorkflowInput } from "./schemas";
+import { applyConfidenceScoring } from "./scoring";
 
 const lines = (items: string[]) => (items.length === 0 ? "- None" : items.map((item) => `- ${item}`).join("\n"));
 
@@ -18,15 +19,29 @@ export const buildAuditReport = async (
     : path.resolve(intake.repoRoot || process.cwd(), requestedOutputDir);
   await mkdir(outputDir, { recursive: true });
 
+  const scored = applyConfidenceScoring(validation, intake, checks);
+  const retainedFindings = scored.validation.findings.slice(0, maxFindings);
   const report: AuditReport = {
-    verdict: validation.verdict,
-    summary: validation.summary,
-    findings: validation.findings.slice(0, maxFindings),
-    discardedFindings: validation.discardedFindings,
+    verdict: scored.validation.verdict,
+    summary:
+      scored.summary.discarded > 0 || scored.summary.downgraded > 0
+        ? `${scored.validation.summary} Confidence scoring retained ${scored.summary.retained}, downgraded ${scored.summary.downgraded}, and discarded ${scored.summary.discarded} finding(s).`
+        : scored.validation.summary,
+    findings: retainedFindings,
+    discardedFindings: scored.validation.discardedFindings,
     checksRun: checks.commandsRun,
-    coverageGaps: validation.coverageGaps,
-    learnedRuleCandidates: validation.learnedRuleCandidates,
-    limitations: [...validation.limitations, ...checks.limitations, ...intake.limitations],
+    coverageGaps: [
+      ...scored.validation.coverageGaps,
+      ...intake.diffBundle.skippedFiles.map((file) => ({
+        area: file.path,
+        missingTest: "Skipped from agent diff review",
+        risk: file.reason,
+      })),
+    ],
+    learnedRuleCandidates: scored.validation.learnedRuleCandidates,
+    limitations: [...scored.validation.limitations, ...checks.limitations, ...intake.limitations],
+    diffBundle: intake.diffBundle,
+    confidenceSummary: scored.summary,
     reportPath: path.join(outputDir, "bug-regression-audit.md"),
   };
 
@@ -81,6 +96,30 @@ ${report.summary}
 - Head: ${intake.resolvedHeadRef || "(unresolved)"} ${intake.resolvedHeadCommit ? `(${intake.resolvedHeadCommit.slice(0, 12)})` : ""}
 - Base resolution: ${intake.baseResolution}
 - Changed files: ${intake.changedFiles.length}
+- Reviewed diff files: ${report.diffBundle.files.length}
+- Skipped diff files: ${report.diffBundle.skippedFiles.length}
+- Diff token budget: ${report.diffBundle.budget.estimatedTokens}/${report.diffBundle.budget.requestedTokens}
+- Diff truncated: ${report.diffBundle.budget.truncated ? "yes" : "no"}
+
+## Confidence Scoring
+
+- Threshold: ${report.confidenceSummary.threshold}
+- Retained: ${report.confidenceSummary.retained}
+- Downgraded: ${report.confidenceSummary.downgraded}
+- Discarded: ${report.confidenceSummary.discarded}
+
+## Reviewed Diff Files
+
+${lines(
+  report.diffBundle.files.map(
+    (file) =>
+      `${file.path} (${file.status}, +${file.additions}/-${file.deletions}, hunks: ${file.hunks.length}, tokens: ${file.tokenEstimate}${file.truncated ? ", truncated" : ""})`,
+  ),
+)}
+
+## Skipped Diff Files
+
+${lines(report.diffBundle.skippedFiles.map((file) => `${file.path} (${file.status}): ${file.reason}`))}
 
 ## Findings
 

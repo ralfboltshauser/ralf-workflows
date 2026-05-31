@@ -1,11 +1,12 @@
 import { exec as execCallback, execFile as execFileCallback } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { CheckEvidence, DiffIntake, WorkflowInput } from "./schemas";
+import { loadEffectiveAuditConfig } from "./config";
+import { buildDiffBundle } from "./diff";
+import type { CheckEvidence, DiffBundle, DiffIntake, EffectiveAuditConfig, WorkflowInput } from "./schemas";
 
 const execAsync = promisify(execCallback);
 const execFileAsync = promisify(execFileCallback);
-const maxDiffChars = 120_000;
 const maxCommandOutputChars = 4_000;
 
 type GitResult = {
@@ -71,13 +72,18 @@ const parseNameStatus = (nameStatus: string, numstat: Map<string, { additions: n
     const parts = line.split("\t");
     const status = parts[0] ?? "";
     const filePath = parts.length > 2 ? parts[parts.length - 1] : parts[1];
+    const oldPath = parts.length > 2 ? parts[1] ?? null : null;
     if (!filePath) continue;
     const counts = numstat.get(filePath) ?? { additions: 0, deletions: 0 };
     files.push({
       path: filePath,
+      oldPath,
       status,
       additions: counts.additions,
       deletions: counts.deletions,
+      generated: false,
+      skipped: false,
+      skipReason: null,
     });
   }
   return files;
@@ -93,6 +99,42 @@ const resolveMergeBase = async (repoRoot: string, baseRef: string, headRef: stri
   return resolved.code === 0 ? resolved.stdout.trim() : "";
 };
 
+const fallbackAuditConfig = (input: WorkflowInput, repoRoot: string, limitations: string[] = []): EffectiveAuditConfig => {
+  const auditMode =
+    input.auditMode === "quick" || input.auditMode === "standard" || input.auditMode === "deep"
+      ? input.auditMode
+      : "standard";
+  const maxDiffTokens = input.maxDiffTokens ?? (auditMode === "quick" ? 12_000 : auditMode === "deep" ? 90_000 : 40_000);
+  const contextLines = input.contextLines ?? (auditMode === "quick" ? 6 : auditMode === "deep" ? 80 : 20);
+  return {
+    configPath: path.resolve(repoRoot, input.configPath ?? ".smithers/bug-regression-audit.config.json"),
+    configLoaded: false,
+    ignoreGlobs: input.ignoreGlobs ?? [],
+    ignoreRegexes: input.ignoreRegexes ?? [],
+    generatedGlobs: [],
+    projectRules: [],
+    auditMode,
+    includeGenerated: Boolean(input.includeGenerated),
+    maxDiffTokens,
+    contextLines,
+    minConfidence: input.minConfidence ?? "low",
+    limitations,
+  };
+};
+
+const emptyDiffBundle = (baseCommit = "", headCommit = "", effectiveBaseCommit = baseCommit): DiffBundle => ({
+  baseCommit,
+  headCommit,
+  effectiveBaseCommit,
+  files: [],
+  skippedFiles: [],
+  budget: {
+    requestedTokens: 1,
+    estimatedTokens: 0,
+    truncated: false,
+  },
+});
+
 export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake> => {
   const commandsRun: string[] = [];
   const limitations: string[] = [];
@@ -103,6 +145,7 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
 
   const rootResult = await runGit(absoluteRepoPath, ["rev-parse", "--show-toplevel"], commandsRun, true);
   if (rootResult.code !== 0) {
+    const auditConfig = fallbackAuditConfig(input, absoluteRepoPath);
     return {
       repoPath: requestedRepoPath,
       repoRoot: absoluteRepoPath,
@@ -120,6 +163,8 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
       hasUncommittedChanges: false,
       untrackedFiles: [],
       changedFiles: [],
+      auditConfig,
+      diffBundle: emptyDiffBundle(),
       diffSummary: "",
       unifiedDiff: "",
       diffTruncated: false,
@@ -129,6 +174,8 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
   }
 
   const repoRoot = rootResult.stdout.trim();
+  const auditConfig = await loadEffectiveAuditConfig(input, repoRoot);
+  limitations.push(...auditConfig.limitations);
   const currentBranch = (await runGit(repoRoot, ["branch", "--show-current"], commandsRun, true)).stdout.trim();
   const upstream = (await runGit(repoRoot, ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{upstream}"], commandsRun, true))
     .stdout.trim();
@@ -159,6 +206,8 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
       hasUncommittedChanges,
       untrackedFiles,
       changedFiles: [],
+      auditConfig,
+      diffBundle: emptyDiffBundle("", resolvedHeadCommit),
       diffSummary: "",
       unifiedDiff: "",
       diffTruncated: false,
@@ -206,6 +255,8 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
       hasUncommittedChanges,
       untrackedFiles,
       changedFiles: [],
+      auditConfig,
+      diffBundle: emptyDiffBundle("", resolvedHeadCommit),
       diffSummary: "",
       unifiedDiff: "",
       diffTruncated: false,
@@ -232,20 +283,43 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
   const nameStatus = await runGit(repoRoot, [...diffArgs, "--name-status"], commandsRun, true);
   const numstat = await runGit(repoRoot, [...diffArgs, "--numstat"], commandsRun, true);
   const stat = await runGit(repoRoot, [...diffArgs, "--stat"], commandsRun, true);
-  const unified = await runGit(repoRoot, [...diffArgs, "--unified=80"], commandsRun, true);
+  const unified = await runGit(repoRoot, [...diffArgs, `--unified=${auditConfig.contextLines}`, "--patch"], commandsRun, true);
   const numstatByPath = parseNumstat(numstat.stdout);
   const changedFiles = parseNameStatus(nameStatus.stdout, numstatByPath);
 
   if (includeUncommitted) {
     for (const untrackedFile of untrackedFiles) {
       if (!changedFiles.some((file) => file.path === untrackedFile)) {
-        changedFiles.push({ path: untrackedFile, status: "??", additions: 0, deletions: 0 });
+        changedFiles.push({
+          path: untrackedFile,
+          oldPath: null,
+          status: "??",
+          additions: 0,
+          deletions: 0,
+          generated: false,
+          skipped: false,
+          skipReason: null,
+        });
       }
     }
   }
 
   const rawDiff = unified.stdout;
-  const truncated = rawDiff.length > maxDiffChars;
+  const { bundle: diffBundle, changedFiles: annotatedChangedFiles } = buildDiffBundle(
+    changedFiles,
+    rawDiff,
+    auditConfig,
+    resolvedBaseCommit,
+    resolvedHeadCommit,
+    resolvedBaseCommit,
+  );
+  if (diffBundle.skippedFiles.length > 0) {
+    limitations.push(
+      `${diffBundle.skippedFiles.length} changed file(s) were skipped or truncated before agent review; see diffBundle.skippedFiles.`,
+    );
+  }
+  const maxDiffChars = Math.max(4_000, auditConfig.maxDiffTokens * 4);
+  const truncated = rawDiff.length > maxDiffChars || diffBundle.budget.truncated;
 
   return {
     repoPath: requestedRepoPath,
@@ -263,7 +337,9 @@ export const buildDiffIntake = async (input: WorkflowInput): Promise<DiffIntake>
     includeUncommitted,
     hasUncommittedChanges,
     untrackedFiles,
-    changedFiles,
+    changedFiles: annotatedChangedFiles,
+    auditConfig,
+    diffBundle,
     diffSummary: stat.stdout.trim(),
     unifiedDiff: excerpt(rawDiff, maxDiffChars),
     diffTruncated: truncated,

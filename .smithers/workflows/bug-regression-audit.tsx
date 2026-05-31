@@ -1,7 +1,7 @@
 // smithers-source: authored
 // smithers-metadata-version: 1
 // smithers-display-name: Bug Regression Audit
-// smithers-description: Audit local code changes for likely accidental bugs using diff-first, evidence-backed specialist review.
+// smithers-description: Audit local code changes for likely accidental bugs using structured diff bundles, evidence-backed specialist review, and confidence scoring.
 // smithers-tags: bugbot, regression-audit, code-review, testing, local-diff
 /** @jsxImportSource smithers-orchestrator */
 import {
@@ -40,7 +40,7 @@ const { Workflow, Task, Sequence, Parallel, outputs, smithers } = createSmithers
   bugRegressionAuditSchemas,
   {
     readableName: "Bug Regression Audit",
-    description: "Audit local code changes for likely accidental bugs using diff-first specialist review.",
+    description: "Audit local code changes for likely accidental bugs using structured diff bundles and evidence-backed specialist review.",
   },
 );
 
@@ -66,18 +66,17 @@ export default smithers((ctx) => {
   const agentCwd = intake?.repoRoot ?? process.cwd();
   const { BugAuditAgent, BugHunterAgent, BugModeratorAgent, BugSkepticAgent } =
     createBugAuditAgents(agentCwd);
-  const auditMode =
+  const requestedAuditMode =
     ctx.input.auditMode === "quick" || ctx.input.auditMode === "standard" || ctx.input.auditMode === "deep"
       ? ctx.input.auditMode
       : "standard";
+  const auditMode = intake?.auditConfig.auditMode ?? requestedAuditMode;
   const includeUncommitted =
     typeof ctx.input.includeUncommitted === "boolean" ? ctx.input.includeUncommitted : true;
 
   const isAuditable =
     intake?.baselineStatus === "resolved" &&
-    (intake.changedFiles.length > 0 ||
-      (includeUncommitted && intake.hasUncommittedChanges) ||
-      intake.unifiedDiff.trim().length > 0);
+    intake.diffBundle.files.length > 0;
 
   const needsRouteReviews = auditMode !== "quick";
   const routeReviews = needsRouteReviews
@@ -221,7 +220,7 @@ export default smithers((ctx) => {
             {{
               ...fallbackValidation(
                 intake.baselineStatus === "resolved"
-                  ? "No changed files were found in the resolved diff scope."
+                  ? "No reviewable text hunks were found in the resolved diff scope."
                   : "The audit is inconclusive because no baseline could be resolved.",
               ),
               verdict: intake.baselineStatus === "resolved" ? "no_clear_bugs" : "inconclusive",

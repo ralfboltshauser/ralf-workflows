@@ -32,7 +32,38 @@ export const workflowInputSchema = z.object({
   maxFindings: z.number().int().positive().default(10),
   outputDir: z.string().default(".smithers/bug-regression-audit-reports"),
   checkCommands: stringList.default([]),
+  configPath: z.string().optional(),
+  ignoreGlobs: stringList.default([]),
+  ignoreRegexes: stringList.default([]),
+  includeGenerated: z.boolean().default(false),
+  maxDiffTokens: z.number().int().positive().optional(),
+  contextLines: z.number().int().nonnegative().optional(),
+  minConfidence: z.enum(confidences).default("low"),
   feedback: feedbackSchema.optional(),
+});
+
+export const auditConfigSchema = z.object({
+  ignoreGlobs: stringList.default([]),
+  ignoreRegexes: stringList.default([]),
+  generatedGlobs: stringList.default([]),
+  projectRules: stringList.default([]),
+  defaultAuditMode: z.enum(auditModes).optional(),
+  minConfidence: z.enum(confidences).default("low"),
+});
+
+export const effectiveAuditConfigSchema = z.object({
+  configPath: z.string(),
+  configLoaded: z.boolean(),
+  ignoreGlobs: stringList,
+  ignoreRegexes: stringList,
+  generatedGlobs: stringList,
+  projectRules: stringList,
+  auditMode: z.enum(auditModes),
+  includeGenerated: z.boolean(),
+  maxDiffTokens: z.number().int().positive(),
+  contextLines: z.number().int().nonnegative(),
+  minConfidence: z.enum(confidences),
+  limitations: stringList,
 });
 
 export const fileRefSchema = z.object({
@@ -86,9 +117,74 @@ export const learnedRuleCandidateSchema = z.object({
 
 export const changedFileSchema = z.object({
   path: z.string(),
+  oldPath: z.string().nullable().default(null),
   status: z.string(),
   additions: z.number().int().nonnegative(),
   deletions: z.number().int().nonnegative(),
+  generated: z.boolean().default(false),
+  skipped: z.boolean().default(false),
+  skipReason: z.string().nullable().default(null),
+});
+
+export const diffLineSchema = z.object({
+  kind: z.enum(["context", "added", "deleted"]),
+  oldLine: z.number().int().positive().nullable(),
+  newLine: z.number().int().positive().nullable(),
+  text: z.string(),
+});
+
+export const sideLineSchema = z.object({
+  line: z.number().int().positive(),
+  kind: z.enum(["context", "added", "deleted"]),
+  text: z.string(),
+});
+
+export const diffHunkSchema = z.object({
+  oldStart: z.number().int().nonnegative(),
+  oldLines: z.number().int().nonnegative(),
+  newStart: z.number().int().nonnegative(),
+  newLines: z.number().int().nonnegative(),
+  section: z.string(),
+  lines: z.array(diffLineSchema),
+  oldSideLines: z.array(sideLineSchema),
+  newSideLines: z.array(sideLineSchema),
+});
+
+export const diffFileBundleSchema = z.object({
+  path: z.string(),
+  oldPath: z.string().nullable(),
+  status: z.string(),
+  additions: z.number().int().nonnegative(),
+  deletions: z.number().int().nonnegative(),
+  generated: z.boolean(),
+  binary: z.boolean(),
+  hunks: z.array(diffHunkSchema),
+  tokenEstimate: z.number().int().nonnegative(),
+  truncated: z.boolean(),
+});
+
+export const skippedDiffFileSchema = z.object({
+  path: z.string(),
+  oldPath: z.string().nullable(),
+  status: z.string(),
+  additions: z.number().int().nonnegative(),
+  deletions: z.number().int().nonnegative(),
+  reason: z.string(),
+});
+
+export const diffBudgetSchema = z.object({
+  requestedTokens: z.number().int().positive(),
+  estimatedTokens: z.number().int().nonnegative(),
+  truncated: z.boolean(),
+});
+
+export const diffBundleSchema = z.object({
+  baseCommit: z.string(),
+  headCommit: z.string(),
+  effectiveBaseCommit: z.string(),
+  files: z.array(diffFileBundleSchema),
+  skippedFiles: z.array(skippedDiffFileSchema),
+  budget: diffBudgetSchema,
 });
 
 export const diffIntakeSchema = z.object({
@@ -108,6 +204,8 @@ export const diffIntakeSchema = z.object({
   hasUncommittedChanges: z.boolean(),
   untrackedFiles: stringList,
   changedFiles: z.array(changedFileSchema),
+  auditConfig: effectiveAuditConfigSchema,
+  diffBundle: diffBundleSchema,
   diffSummary: z.string(),
   unifiedDiff: z.string(),
   diffTruncated: z.boolean(),
@@ -239,6 +337,13 @@ export const validationReportSchema = z.object({
   limitations: stringList,
 });
 
+export const confidenceSummarySchema = z.object({
+  retained: z.number().int().nonnegative(),
+  downgraded: z.number().int().nonnegative(),
+  discarded: z.number().int().nonnegative(),
+  threshold: z.enum(confidences),
+});
+
 export const auditReportSchema = z.object({
   verdict: z.enum(verdicts),
   summary: z.string(),
@@ -248,6 +353,8 @@ export const auditReportSchema = z.object({
   coverageGaps: z.array(coverageGapSchema),
   learnedRuleCandidates: z.array(learnedRuleCandidateSchema),
   limitations: stringList,
+  diffBundle: diffBundleSchema,
+  confidenceSummary: confidenceSummarySchema,
   reportPath: z.string(),
 });
 
@@ -277,8 +384,13 @@ export const bugRegressionAuditSchemas = {
 };
 
 export type WorkflowInput = z.infer<typeof workflowInputSchema>;
+export type EffectiveAuditConfig = z.infer<typeof effectiveAuditConfigSchema>;
 export type DiffIntake = z.infer<typeof diffIntakeSchema>;
 export type AuditReport = z.infer<typeof auditReportSchema>;
 export type CandidateBatch = z.infer<typeof candidateBatchSchema>;
 export type CheckEvidence = z.infer<typeof checkEvidenceSchema>;
 export type ValidationReport = z.infer<typeof validationReportSchema>;
+export type DiffBundle = z.infer<typeof diffBundleSchema>;
+export type DiffFileBundle = z.infer<typeof diffFileBundleSchema>;
+export type SkippedDiffFile = z.infer<typeof skippedDiffFileSchema>;
+export type ConfidenceSummary = z.infer<typeof confidenceSummarySchema>;

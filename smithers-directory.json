@@ -13,10 +13,22 @@
     {
       "name": "bug-regression-audit",
       "entry": ".smithers/workflows/bug-regression-audit.tsx",
-      "description": "Audit local code changes for likely accidental bugs using diff-first, evidence-backed specialist review.",
+      "description": "Audit local code changes for likely accidental bugs using structured diff bundles, evidence-backed specialist review, and confidence scoring.",
       "tags": ["bugbot", "regression-audit", "code-review", "testing", "local-diff"],
       "env": [],
-      "capabilities": ["filesystem", "shell", "codex"]
+      "capabilities": ["filesystem", "shell", "codex"],
+      "files": [
+        ".smithers/components/bug-regression-audit/agents.ts",
+        ".smithers/components/bug-regression-audit/config.ts",
+        ".smithers/components/bug-regression-audit/diff.ts",
+        ".smithers/components/bug-regression-audit/git.ts",
+        ".smithers/components/bug-regression-audit/hunters.ts",
+        ".smithers/components/bug-regression-audit/index.ts",
+        ".smithers/components/bug-regression-audit/prompts.ts",
+        ".smithers/components/bug-regression-audit/report.ts",
+        ".smithers/components/bug-regression-audit/schemas.ts",
+        ".smithers/components/bug-regression-audit/scoring.ts"
+      ]
     },
     {
       "name": "lighthouse-check",
@@ -31,6 +43,34 @@
         ".smithers/lib/lighthouse/lhci.ts",
         ".smithers/lib/lighthouse/prompts.ts",
         ".smithers/lib/lighthouse/schemas.ts"
+      ]
+    },
+    {
+      "name": "bug-regression-audit-pr",
+      "entry": ".smithers/workflows/bug-regression-audit-pr.tsx",
+      "description": "Run the bug regression audit workflow against a GitHub PR using an effective merge-base checkout, then prepare or publish PR review comments.",
+      "tags": ["bugbot", "regression-audit", "code-review", "github-pr", "pr-review"],
+      "env": [],
+      "capabilities": ["filesystem", "shell", "codex", "github"],
+      "files": [
+        ".smithers/workflows/bug-regression-audit.tsx",
+        ".smithers/components/bug-regression-audit/agents.ts",
+        ".smithers/components/bug-regression-audit/config.ts",
+        ".smithers/components/bug-regression-audit/diff.ts",
+        ".smithers/components/bug-regression-audit/git.ts",
+        ".smithers/components/bug-regression-audit/hunters.ts",
+        ".smithers/components/bug-regression-audit/index.ts",
+        ".smithers/components/bug-regression-audit/prompts.ts",
+        ".smithers/components/bug-regression-audit/report.ts",
+        ".smithers/components/bug-regression-audit/schemas.ts",
+        ".smithers/components/bug-regression-audit/scoring.ts",
+        ".smithers/components/bug-regression-audit-pr/anchors.ts",
+        ".smithers/components/bug-regression-audit-pr/format.ts",
+        ".smithers/components/bug-regression-audit-pr/github.ts",
+        ".smithers/components/bug-regression-audit-pr/index.ts",
+        ".smithers/components/bug-regression-audit-pr/output.ts",
+        ".smithers/components/bug-regression-audit-pr/publish.ts",
+        ".smithers/components/bug-regression-audit-pr/schemas.ts"
       ]
     }
   ]
