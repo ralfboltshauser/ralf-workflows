@@ -8,7 +8,17 @@
       "description": "Return a static Hello World response.",
       "tags": ["example", "hello-world"],
       "env": [],
-      "capabilities": []
+      "capabilities": [],
+      "files": [],
+      "docs": [
+        {
+          "title": "Operator guide",
+          "path": "docs/hello-world.md",
+          "summary": "Smoke-test workflow usage, expected output, and failure meaning.",
+          "showOnInstall": true,
+          "exampleCommand": "bunx smithers-orchestrator workflow run hello-world --run-id hello-world-check"
+        }
+      ]
     },
     {
       "name": "bug-regression-audit",
@@ -17,6 +27,15 @@
       "tags": ["bugbot", "regression-audit", "code-review", "testing", "local-diff"],
       "env": [],
       "capabilities": ["filesystem", "shell", "codex"],
+      "docs": [
+        {
+          "title": "Operator guide",
+          "path": "docs/bug-regression-audit.md",
+          "summary": "How to audit a local git diff, choose baselines, pass checks, and read the regression report.",
+          "showOnInstall": true,
+          "exampleCommand": "bunx smithers-orchestrator workflow run bug-regression-audit --input '{\"repoPath\":\".\",\"baseRef\":\"origin/main\",\"headRef\":\"HEAD\",\"includeUncommitted\":true,\"auditMode\":\"quick\"}'"
+        }
+      ],
       "files": [
         ".smithers/components/bug-regression-audit/agents.ts",
         ".smithers/components/bug-regression-audit/config.ts",
@@ -37,6 +56,15 @@
       "tags": ["lighthouse", "performance", "accessibility", "seo", "web", "optimization"],
       "env": [],
       "capabilities": ["filesystem", "shell", "codex", "network"],
+      "docs": [
+        {
+          "title": "Operator guide",
+          "path": "docs/lighthouse-check.md",
+          "summary": "How to run local and optional production Lighthouse checks, configure inputs, and keep runs report-only.",
+          "showOnInstall": true,
+          "exampleCommand": "bunx smithers-orchestrator workflow run lighthouse-check --input '{\"repoPath\":\".\",\"localUrl\":\"http://localhost:3000\",\"routes\":[\"/\"],\"numberOfRuns\":3,\"allowImplementation\":false}'"
+        }
+      ],
       "files": [
         ".smithers/lib/lighthouse/index.ts",
         ".smithers/lib/lighthouse/lhci.test.js",
@@ -52,6 +80,15 @@
       "tags": ["bugbot", "regression-audit", "code-review", "github-pr", "pr-review"],
       "env": [],
       "capabilities": ["filesystem", "shell", "codex", "github"],
+      "docs": [
+        {
+          "title": "Operator guide",
+          "path": "docs/bug-regression-audit-pr.md",
+          "summary": "How to audit a GitHub PR, prepare or publish review comments, and handle dry-run behavior.",
+          "showOnInstall": true,
+          "exampleCommand": "bunx smithers-orchestrator workflow run bug-regression-audit-pr --input '{\"pr\":\"https://github.com/OWNER/REPO/pull/123\",\"auditMode\":\"quick\",\"publishMode\":\"dry-run\"}'"
+        }
+      ],
       "files": [
         ".smithers/workflows/bug-regression-audit.tsx",
         ".smithers/components/bug-regression-audit/agents.ts",
@@ -71,6 +108,24 @@
         ".smithers/components/bug-regression-audit-pr/output.ts",
         ".smithers/components/bug-regression-audit-pr/publish.ts",
         ".smithers/components/bug-regression-audit-pr/schemas.ts"
+      ]
+    },
+    {
+      "name": "cyber-security-audit",
+      "entry": ".smithers/workflows/cyber-security-audit.tsx",
+      "description": "Run a read-only cyber security audit and write a markdown report covering architecture, assets, CIA impact, code, supply chain, CI/CD, runtime, and AI-generated code.",
+      "tags": ["cyber-security", "audit", "appsec", "threat-modeling", "devsecops", "ai-code", "read-only", "report-only"],
+      "env": [],
+      "capabilities": ["filesystem", "shell", "codex"],
+      "files": [],
+      "docs": [
+        {
+          "title": "Operator guide",
+          "path": "docs/cyber-security-audit.md",
+          "summary": "How to run the read-only security audit, scope active checks, and read the generated report.",
+          "showOnInstall": true,
+          "exampleCommand": "bunx smithers-orchestrator workflow run cyber-security-audit --input '{\"repoPath\":\".\",\"auditMode\":\"quick\",\"allowActiveScanning\":false}'"
+        }
       ]
     }
   ]

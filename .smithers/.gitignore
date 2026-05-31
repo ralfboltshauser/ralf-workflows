@@ -16,6 +16,7 @@ dist/
 # Log files
 *.log
 logs/
+audit-reports/
 
 # Nested Smithers runtime state created when running workflows from subdirectories
 **/.smithers/executions/

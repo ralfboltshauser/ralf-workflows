@@ -19,6 +19,7 @@ npx smithers-directory add ralfboltshauser/ralf-workflows@hello-world
 npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit
 npx smithers-directory add ralfboltshauser/ralf-workflows@lighthouse-check
 npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit-pr
+npx smithers-directory add ralfboltshauser/ralf-workflows@cyber-security-audit
 ```
 
 ## Layout
@@ -27,6 +28,14 @@ npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit-p
 - `.smithers/package.json` and `.smithers/bun.lock` define the local Smithers runtime dependencies.
 - `.smithers/agents.ts` maps workflow agent slots to Codex.
 - `smithers-directory.json` lists only workflows intended for public installation.
+- `docs/*.md` contains install-facing operator guides referenced by workflow `docs` entries.
+
+## Planned Workflows
+
+- `web-performance-improvement`: Improve deployed or local web app performance using Lighthouse/LHCI evidence, codebase review, scoped fixes, and before/after checks.
+- `database-performance-improvement`: Improve database performance through query-plan review, indexing, schema/query changes, and workload-specific verification.
+- `ci-build-performance-improvement`: Improve build, test, and CI pipeline speed through caching, task ordering, dependency install, and parallelization review.
+- `api-performance-improvement`: Improve API latency and throughput through endpoint profiling, load-aware review, caching, request shaping, and regression checks.
 
 ## Setup
 
@@ -49,7 +58,7 @@ bunx smithers-orchestrator workflow list
 Run the Hello World workflow:
 
 ```bash
-bunx smithers-orchestrator up .smithers/workflows/hello-world.tsx --run-id hello-world-check
+bunx smithers-orchestrator workflow run hello-world --run-id hello-world-check
 ```
 
 Run the bug regression audit workflow against a local diff:
@@ -117,6 +126,38 @@ Common inputs:
 - `routes`: routes to audit; defaults to `["/"]`.
 - `numberOfRuns`: Lighthouse runs per target; defaults to `5`.
 - `allowImplementation`: set `false` for report-only audits.
+
+Run the cyber security audit workflow in repo-only mode:
+
+```bash
+bunx smithers-orchestrator workflow run cyber-security-audit --run-id cyber-audit-check --input '{"repoPath":".","auditMode":"standard","allowActiveScanning":false}'
+```
+
+### Cyber Security Audit Safety Defaults
+
+`cyber-security-audit` is report-only by default:
+
+- Agent phases run through a read-only Codex sandbox.
+- Active network scanning is disabled unless `allowActiveScanning=true` and a valid `targetUrl` are supplied.
+- The audited repository is not edited. The workflow does not run formatters, fixers, installs, migrations, lockfile updates, or code changes.
+- The only intended write is the final markdown report at `.smithers/audit-reports/audit-report.md`, or at the custom `outputDir` you provide.
+- `repoPath` and `outputDir` must resolve inside the workflow workspace unless `allowOutOfWorkspacePaths=true` is explicitly set.
+- Concrete secret values are redacted in the final report, but friends should still avoid testing on repositories with live production secrets committed to disk because Smithers run state and agent traces may include local evidence.
+
+Useful v1 test commands:
+
+```bash
+# Quick local repo audit, report only
+bunx smithers-orchestrator workflow run cyber-security-audit --input '{"repoPath":".","auditMode":"quick","allowActiveScanning":false}'
+
+# Audit another local checkout from this workflow pack
+bunx smithers-orchestrator workflow run cyber-security-audit --input '{"repoPath":"/path/to/project","auditMode":"quick","allowOutOfWorkspacePaths":true,"allowActiveScanning":false}'
+
+# Include recent commit-history context
+bunx smithers-orchestrator workflow run cyber-security-audit --input '{"repoPath":".","auditMode":"standard","scanCommitHistorySince":"2 months ago","allowActiveScanning":false}'
+```
+
+Optional scanners such as Semgrep, CodeQL, Gitleaks, TruffleHog, OSV-Scanner, Trivy, Syft, Grype, Checkov, Nuclei, ZAP, and testssl.sh improve evidence collection when already installed. The workflow records missing tools instead of installing them.
 
 ## Authoring Flow
 

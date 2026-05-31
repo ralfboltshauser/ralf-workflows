@@ -18,3 +18,4 @@ dist/
 **/.smithers/bug-regression-audit-reports/
 **/.smithers/lighthouse-reports/
 **/.smithers/bug-regression-audit-pr-reports/
+**/.smithers/audit-reports/
