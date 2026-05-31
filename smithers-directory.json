@@ -25,7 +25,13 @@
       "tags": ["lighthouse", "performance", "accessibility", "seo", "web", "optimization"],
       "env": [],
       "capabilities": ["filesystem", "shell", "codex", "network"],
-      "files": [".smithers/lib/lighthouse"]
+      "files": [
+        ".smithers/lib/lighthouse/index.ts",
+        ".smithers/lib/lighthouse/lhci.test.js",
+        ".smithers/lib/lighthouse/lhci.ts",
+        ".smithers/lib/lighthouse/prompts.ts",
+        ".smithers/lib/lighthouse/schemas.ts"
+      ]
     }
   ]
 }
