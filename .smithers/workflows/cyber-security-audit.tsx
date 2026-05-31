@@ -307,11 +307,15 @@ const { Workflow, Task, outputs, smithers } = createSmithers({
     validationConcurrency: z.number().int().min(1).max(4).default(2),
   }),
   scopePolicy: z.object({
+    runId: z.string(),
     workspaceRoot: z.string(),
     repoPathInput: z.string(),
     outputDirInput: z.string(),
     repoPath: z.string(),
     outputDir: z.string(),
+    reportTimestamp: z.string(),
+    reportFilename: z.string(),
+    reportPath: z.string(),
     repoPathInsideWorkspace: z.boolean(),
     outputDirInsideWorkspace: z.boolean(),
     activeScanningAllowed: z.boolean(),
@@ -527,7 +531,7 @@ Audit method to apply:
 	- For LLM/RAG/agentic features, review prompt injection, data leakage, tool permissions, RAG ACLs, output handling, excessive agency, and unbounded consumption.
 	- Use local repository evidence only during audit execution. Do not browse the web or do external research from inside the audit workflow.
 	- Agent phases are read-only. Do not edit files, create files, redirect command output to files, run formatters, run autofix commands, install packages, update lockfiles, or otherwise mutate the audited repository.
-	- The only allowed write in the entire workflow is the deterministic final audit report written to scopePolicy.outputDir/audit-report.md.
+	- The only allowed write in the entire workflow is the run-scoped final audit report written to scopePolicy.reportPath.
 	- Never include concrete secret, token, password, key, cookie, or credential values in structured output. Redact values as [REDACTED] while preserving variable names, file paths, and line numbers.
 	- Do not perform credential attacks, destructive fuzzing, exploit chaining, persistence, data exfiltration, or high-volume scans.
 	- Active network scanning is allowed only when allowActiveScanning is true and a targetUrl is provided.
@@ -640,12 +644,20 @@ const boundedList = (items: string[], max: number) => uniqueList(items).slice(0,
 
 const validationConcurrency = (value: number) => Math.min(4, Math.max(1, Number.isFinite(value) ? value : 2));
 
-const slugify = (value: string) =>
+const slugifyToken = (value: string, fallback: string, maxLength = 56) =>
   value
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 56) || "finding";
+    .slice(0, maxLength) || fallback;
+
+const slugify = (value: string) => slugifyToken(value, "finding");
+
+const timestampForFilename = (date: Date) =>
+  date.toISOString().replace(/[-:]/g, "").replace(".", "").replace("T", "-");
+
+const auditReportFilename = (runId: string, timestamp: string) =>
+  `audit-report-${timestamp}-${slugifyToken(runId, "run", 48)}.md`;
 
 const findingValidationId = (entry: Pick<Finding, "title">, index: number) =>
   `validate-finding-${String(index + 1).padStart(3, "0")}-${slugify(entry.title)}`;
@@ -1141,41 +1153,47 @@ export default smithers((ctx) => {
 
   return (
     <Workflow name="cyber-security-audit">
-	      <Task id="scope-policy" output={outputs.scopePolicy} noRetry>
-	        {() => {
-	          const workspaceRoot = realpathSync(process.cwd());
-	          const repoPathInput = ctx.input.repoPath || ".";
-	          const outputDirInput = ctx.input.outputDir || ".smithers/audit-reports";
-	          const allowOutOfWorkspacePaths = ctx.input.allowOutOfWorkspacePaths === true;
-	          const repoPathCandidate = resolvePath(workspaceRoot, repoPathInput);
-	          if (!existsSync(repoPathCandidate)) {
-	            throw new Error(`Repository path does not exist: ${repoPathCandidate}`);
-	          }
-	          const repoPath = realpathSync(repoPathCandidate);
-	          const outputDirCandidate = resolvePath(workspaceRoot, outputDirInput);
-	          const outputDirPlannedReal = realpathForMaybeMissing(outputDirCandidate);
-	          const repoPathInsideWorkspace = isInside(workspaceRoot, repoPath);
-	          const outputDirInsideWorkspace = isInside(workspaceRoot, outputDirPlannedReal);
-	          const warnings: string[] = [];
+      <Task id="scope-policy" output={outputs.scopePolicy} noRetry>
+        {() => {
+          const workspaceRoot = realpathSync(process.cwd());
+          const repoPathInput = ctx.input.repoPath || ".";
+          const outputDirInput = ctx.input.outputDir || ".smithers/audit-reports";
+          const allowOutOfWorkspacePaths = ctx.input.allowOutOfWorkspacePaths === true;
+          const repoPathCandidate = resolvePath(workspaceRoot, repoPathInput);
+          if (!existsSync(repoPathCandidate)) {
+            throw new Error(`Repository path does not exist: ${repoPathCandidate}`);
+          }
+          const repoPath = realpathSync(repoPathCandidate);
+          const outputDirCandidate = resolvePath(workspaceRoot, outputDirInput);
+          const outputDirPlannedReal = realpathForMaybeMissing(outputDirCandidate);
+          const repoPathInsideWorkspace = isInside(workspaceRoot, repoPath);
+          const outputDirInsideWorkspace = isInside(workspaceRoot, outputDirPlannedReal);
+          const warnings: string[] = [];
 
-	          if (!repoPathInsideWorkspace) {
-	            warnings.push(`repoPath resolves outside workspaceRoot: ${repoPath}`);
-	          }
-	          if (!outputDirInsideWorkspace) {
-	            warnings.push(`outputDir resolves outside workspaceRoot: ${outputDirPlannedReal}`);
-	          }
-	          if ((!repoPathInsideWorkspace || !outputDirInsideWorkspace) && !allowOutOfWorkspacePaths) {
-	            throw new Error(
-	              "Unsafe audit scope: repoPath and outputDir must resolve inside the workflow workspace unless allowOutOfWorkspacePaths is true.",
-	            );
-	          }
+          if (!repoPathInsideWorkspace) {
+            warnings.push(`repoPath resolves outside workspaceRoot: ${repoPath}`);
+          }
+          if (!outputDirInsideWorkspace) {
+            warnings.push(`outputDir resolves outside workspaceRoot: ${outputDirPlannedReal}`);
+          }
+          if ((!repoPathInsideWorkspace || !outputDirInsideWorkspace) && !allowOutOfWorkspacePaths) {
+            throw new Error(
+              "Unsafe audit scope: repoPath and outputDir must resolve inside the workflow workspace unless allowOutOfWorkspacePaths is true.",
+            );
+          }
 
-	          mkdirSync(outputDirCandidate, { recursive: true });
-	          const outputDirReal = realpathSync(outputDirCandidate);
-	          const outputDirInsideWorkspaceFinal = isInside(workspaceRoot, outputDirReal);
-	          if (!outputDirInsideWorkspaceFinal && !allowOutOfWorkspacePaths) {
-	            throw new Error(`Refusing to use outputDir outside workspaceRoot: ${outputDirReal}`);
-	          }
+          mkdirSync(outputDirCandidate, { recursive: true });
+          const outputDirReal = realpathSync(outputDirCandidate);
+          const outputDirInsideWorkspaceFinal = isInside(workspaceRoot, outputDirReal);
+          if (!outputDirInsideWorkspaceFinal && !allowOutOfWorkspacePaths) {
+            throw new Error(`Refusing to use outputDir outside workspaceRoot: ${outputDirReal}`);
+          }
+          const reportTimestamp = timestampForFilename(new Date());
+          const reportFilename = auditReportFilename(ctx.runId, reportTimestamp);
+          const reportPath = resolve(outputDirReal, reportFilename);
+          if (!isInside(outputDirReal, reportPath)) {
+            throw new Error(`Refusing to use report path outside output directory: ${reportPath}`);
+          }
 
           const targetUrl = ctx.input.targetUrl || "";
           let targetHost = "";
@@ -1200,28 +1218,32 @@ export default smithers((ctx) => {
           }
 
           return {
+            runId: ctx.runId,
             workspaceRoot,
             repoPathInput,
             outputDirInput,
-	            repoPath,
-	            outputDir: outputDirReal,
-	            repoPathInsideWorkspace,
-	            outputDirInsideWorkspace: outputDirInsideWorkspaceFinal,
+            repoPath,
+            outputDir: outputDirReal,
+            reportTimestamp,
+            reportFilename,
+            reportPath,
+            repoPathInsideWorkspace,
+            outputDirInsideWorkspace: outputDirInsideWorkspaceFinal,
             activeScanningAllowed,
             targetUrl,
             targetHost,
             policySummary: activeScanningAllowed
               ? `Repo-local audit with active scanning authorized for ${targetHost}.`
               : "Repo-local audit only. Active network scanning is disabled.",
-	            guardrails: [
-	              "Use scopePolicy.repoPath as the only repository root.",
-	              "Agent phases are read-only and must return structured output only.",
-	              "The only allowed write is the deterministic final audit report at scopePolicy.outputDir/audit-report.md.",
-	              "Do not read or write outside workspaceRoot unless allowOutOfWorkspacePaths was true at preflight.",
-	              "Do not run active network scanning unless scopePolicy.activeScanningAllowed is true.",
-	              "Do not browse the web or perform external research from inside the audit workflow.",
-	              "Redact concrete secret values in all outputs; preserve names and line references, not raw values.",
-	            ],
+            guardrails: [
+              "Use scopePolicy.repoPath as the only repository root.",
+              "Agent phases are read-only and must return structured output only.",
+              "The only allowed write is the run-scoped final audit report at scopePolicy.reportPath.",
+              "Do not read or write outside workspaceRoot unless allowOutOfWorkspacePaths was true at preflight.",
+              "Do not run active network scanning unless scopePolicy.activeScanningAllowed is true.",
+              "Do not browse the web or perform external research from inside the audit workflow.",
+              "Redact concrete secret values in all outputs; preserve names and line references, not raw values.",
+            ],
             warnings,
           };
         }}
@@ -1846,7 +1868,7 @@ Work to perform:
 8. Include limitations, external inspection needs, and a re-audit plan.
 9. Preserve exact evidence from Manual review, especially file paths and line numbers. Do not replace line-specific evidence with generic path-only summaries.
 10. Do not write files. Populate reportMarkdown with the complete human-readable markdown report.
-11. Set reportPath to scopePolicy.outputDir/audit-report.md as the intended deterministic write path. Set artifactDirectory to scopePolicy.outputDir.
+11. Set reportPath to scopePolicy.reportPath as the intended run-scoped write path. Set artifactDirectory to scopePolicy.outputDir.
 
 The reportMarkdown value should be useful to builders and security reviewers. Include sections for Scope, Architecture Inventory, Asset Inventory, CIA Impact Summary, Most Dangerous Paths, Findings, Prioritized Backlog, External Inspection Plan, Scanner Coverage, Limitations, and Re-audit Plan.
 `}
@@ -2303,7 +2325,7 @@ The reportMarkdown value should be useful to builders and security reviewers. In
       {scopePolicy && auditReport && validationSummary && qualityGate ? (
         <Task id="write-report-file" output={outputs.reportFile} noRetry>
           {() => {
-            const reportPath = resolve(scopePolicy.outputDir, "audit-report.md");
+            const reportPath = scopePolicy.reportPath;
             if (!isInside(scopePolicy.outputDir, reportPath)) {
               throw new Error(`Refusing to write report outside output directory: ${reportPath}`);
             }

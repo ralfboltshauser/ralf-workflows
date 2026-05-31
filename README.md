@@ -140,7 +140,7 @@ bunx smithers-orchestrator workflow run cyber-security-audit --run-id cyber-audi
 - Agent phases run through a read-only Codex sandbox.
 - Active network scanning is disabled unless `allowActiveScanning=true` and a valid `targetUrl` are supplied.
 - The audited repository is not edited. The workflow does not run formatters, fixers, installs, migrations, lockfile updates, or code changes.
-- The only intended write is the final markdown report at `.smithers/audit-reports/audit-report.md`, or at the custom `outputDir` you provide.
+- The only intended write is a timestamped markdown report under `.smithers/audit-reports/`, or under the custom `outputDir` you provide. Repeated runs create separate files such as `audit-report-20260531-174825123Z-my-run.md`.
 - `repoPath` and `outputDir` must resolve inside the workflow workspace unless `allowOutOfWorkspacePaths=true` is explicitly set.
 - Concrete secret values are redacted in the final report, but friends should still avoid testing on repositories with live production secrets committed to disk because Smithers run state and agent traces may include local evidence.
 

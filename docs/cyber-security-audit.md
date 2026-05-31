@@ -6,7 +6,7 @@
 
 ## Required Inputs
 
-No input is required for a repo-local audit. By default it audits `repoPath:"."` in `standard` mode and writes to `.smithers/audit-reports`.
+No input is required for a repo-local audit. By default it audits `repoPath:"."` in `standard` mode and writes a timestamped markdown report to `.smithers/audit-reports`.
 
 ## Example Runs
 
@@ -51,7 +51,7 @@ bunx smithers-orchestrator workflow run cyber-security-audit --input '{"repoPath
 - Runs read-only Codex review phases for intake, asset mapping, threat modeling, evidence collection, manual review, validation, and report writing.
 - Records missing optional scanner tools instead of installing them.
 - Separates proven or likely findings from scanner leads, limitations, and external inspection needs.
-- Writes `audit-report.md` under `outputDir`.
+- Writes a unique `audit-report-<UTC timestamp>-<run id>.md` file under `outputDir`, so repeated runs do not overwrite earlier reports.
 
 ## Safety Defaults
 
