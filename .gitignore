@@ -15,3 +15,4 @@ dist/
 **/.smithers/state/
 **/.smithers/tmp/
 **/.smithers/logs/
+**/.smithers/bug-regression-audit-reports/

@@ -16,6 +16,7 @@ Install one workflow with:
 
 ```bash
 npx smithers-directory add ralfboltshauser/ralf-workflows@hello-world
+npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit
 ```
 
 ## Layout
@@ -47,6 +48,22 @@ Run the Hello World workflow:
 
 ```bash
 bunx smithers-orchestrator up .smithers/workflows/hello-world.tsx --run-id hello-world-check
+```
+
+Run the bug regression audit workflow against a local diff:
+
+```bash
+bunx smithers-orchestrator workflow run bug-regression-audit --input '{"repoPath":".","baseRef":"HEAD~1","headRef":"HEAD","includeUncommitted":true,"auditMode":"quick"}'
+```
+
+The CLI final `output` contains the structured audit report, and the same result is written as markdown under `outputDir`.
+
+Run the external-repo smoke fixture:
+
+```bash
+cd .smithers
+bun run smoke:bug-regression-audit
+cd ..
 ```
 
 ## Authoring Flow
