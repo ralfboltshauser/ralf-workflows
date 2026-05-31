@@ -9,6 +9,14 @@
       "tags": ["example", "hello-world"],
       "env": [],
       "capabilities": []
+    },
+    {
+      "name": "bug-regression-audit",
+      "entry": ".smithers/workflows/bug-regression-audit.tsx",
+      "description": "Audit local code changes for likely accidental bugs using diff-first, evidence-backed specialist review.",
+      "tags": ["bugbot", "regression-audit", "code-review", "testing", "local-diff"],
+      "env": [],
+      "capabilities": ["filesystem", "shell", "codex"]
     }
   ]
 }

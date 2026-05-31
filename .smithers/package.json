@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "smoke:bug-regression-audit": "bun scripts/smoke-bug-regression-audit.ts",
     "workflow:list": "smithers workflow list",
     "workflow:run": "smithers workflow run",
     "workflow:inspect": "smithers workflow inspect",
