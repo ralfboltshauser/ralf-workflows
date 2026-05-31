@@ -1,7 +1,7 @@
 import { CodexAgent as SmithersCodexAgent } from "smithers-orchestrator";
-import { CodexAgent } from "../../agents";
 
-const disabledTools = [...new Set([...(CodexAgent.opts.disable ?? []), "web_search"])];
+const disabledTools = ["web_search"];
+const defaultModel = process.env.SMITHERS_BUG_AUDIT_MODEL || "gpt-5.3-codex";
 
 // The Smithers trace collector currently treats Codex JSONL's final
 // unterminated line as a truncated stream. This subclass keeps Codex execution
@@ -30,11 +30,12 @@ You moderate independent regression reviews. Merge duplicates, preserve evidence
 
 const withSystemPrompt = (systemPrompt: string, cwd = process.cwd(), id = "bug-audit-agent") =>
   new AuditCliAgent({
-    ...CodexAgent.opts,
     id,
+    model: defaultModel,
     cwd,
+    skipGitRepoCheck: true,
     disable: disabledTools,
-    systemPrompt: [CodexAgent.opts.systemPrompt, systemPrompt].filter(Boolean).join("\n\n"),
+    systemPrompt,
   });
 
 export const createBugAuditAgents = (cwd: string) => ({
