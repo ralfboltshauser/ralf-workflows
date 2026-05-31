@@ -18,6 +18,7 @@ Install one workflow with:
 npx smithers-directory add ralfboltshauser/ralf-workflows@hello-world
 npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit
 npx smithers-directory add ralfboltshauser/ralf-workflows@lighthouse-check
+npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit-pr
 ```
 
 ## Layout
@@ -58,12 +59,24 @@ bunx smithers-orchestrator workflow run bug-regression-audit --input '{"repoPath
 ```
 
 The CLI final `output` contains the structured audit report, and the same result is written as markdown under `outputDir`.
+The audit understands optional `.smithers/bug-regression-audit.config.json` project defaults for ignore globs, generated-file globs, project rules, and confidence thresholds.
+
+Run the bug regression audit PR wrapper in dry-run mode:
+
+```bash
+bunx smithers-orchestrator workflow run bug-regression-audit-pr --input '{"pr":"https://github.com/OWNER/REPO/pull/123","auditMode":"quick","publishMode":"dry-run"}'
+```
+
+The PR wrapper prepares inline-ready comments by default. It only posts to GitHub when `publishMode` is explicitly set to `summary-comment` or `review`.
+For PRs, the wrapper computes the effective merge base in a temporary checkout and passes that baseline into the underlying audit workflow.
 
 Run the external-repo smoke fixture:
 
 ```bash
 cd .smithers
+bun run smoke:bug-regression-audit-core
 bun run smoke:bug-regression-audit
+bun run smoke:bug-regression-audit-pr
 cd ..
 ```
 

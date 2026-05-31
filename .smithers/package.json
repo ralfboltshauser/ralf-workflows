@@ -4,8 +4,10 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "smoke:bug-regression-audit-core": "bun scripts/smoke-bug-regression-audit-core.ts",
     "smoke:bug-regression-audit": "bun scripts/smoke-bug-regression-audit.ts",
     "test": "bun test",
+    "smoke:bug-regression-audit-pr": "bun scripts/smoke-bug-regression-audit-pr.ts",
     "workflow:list": "smithers workflow list",
     "workflow:run": "smithers workflow run",
     "workflow:inspect": "smithers workflow inspect",
