@@ -127,6 +127,24 @@
           "exampleCommand": "bunx smithers-orchestrator workflow run cyber-security-audit --input '{\"repoPath\":\".\",\"auditMode\":\"quick\",\"allowActiveScanning\":false}'"
         }
       ]
+    },
+    {
+      "name": "smithers-image-generation",
+      "entry": ".smithers/workflows/smithers-image-generation.tsx",
+      "description": "Spawn a Codex image-generation task from a prompt and save the resulting raster image artifact.",
+      "tags": ["image-generation", "prompt", "visual"],
+      "env": [],
+      "capabilities": ["filesystem", "codex"],
+      "files": [],
+      "docs": [
+        {
+          "title": "Operator guide",
+          "path": "docs/smithers-image-generation.md",
+          "summary": "How to generate a prompt-based image artifact through Codex built-in image generation.",
+          "showOnInstall": true,
+          "exampleCommand": "bunx smithers-orchestrator workflow run smithers-image-generation --input '{\"prompt\":\"Zurich with purple whales flying in the air\",\"style\":\"cinematic surreal cityscape, recognizable Zurich skyline and lake, high detail, no text\",\"outputPath\":\".smithers/image-generations/demo/zurich-purple-whales.png\"}'"
+        }
+      ]
     }
   ]
 }
