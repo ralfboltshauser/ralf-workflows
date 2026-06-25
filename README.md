@@ -20,6 +20,7 @@ npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit
 npx smithers-directory add ralfboltshauser/ralf-workflows@lighthouse-check
 npx smithers-directory add ralfboltshauser/ralf-workflows@bug-regression-audit-pr
 npx smithers-directory add ralfboltshauser/ralf-workflows@cyber-security-audit
+npx smithers-directory add ralfboltshauser/ralf-workflows@smithers-image-generation
 ```
 
 ## Layout
@@ -158,6 +159,14 @@ bunx smithers-orchestrator workflow run cyber-security-audit --input '{"repoPath
 ```
 
 Optional scanners such as Semgrep, CodeQL, Gitleaks, TruffleHog, OSV-Scanner, Trivy, Syft, Grype, Checkov, Nuclei, ZAP, and testssl.sh improve evidence collection when already installed. The workflow records missing tools instead of installing them.
+
+Run the prompt image-generation workflow:
+
+```bash
+bunx smithers-orchestrator workflow run smithers-image-generation --input '{"prompt":"Zurich with purple whales flying in the air","style":"cinematic surreal cityscape, recognizable Zurich skyline and lake, high detail, no text","outputPath":".smithers/image-generations/demo/zurich-purple-whales.png"}'
+```
+
+This workflow runs `codex exec` with Codex built-in image generation enabled, copies the newest PNG created after the task starts from `$CODEX_HOME/generated_images` to the requested path, and fails if no fresh image appears. See `docs/smithers-image-generation.md` for the feature-flag details.
 
 ## Authoring Flow
 
